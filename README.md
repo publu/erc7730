@@ -18,7 +18,7 @@ ERC-7730 had the potential to **revolutionize blockchain UX**, but instead, it�
 - **Formatting Like Perfectionists:** A single missing comma can send you on a debugging spiral longer than *The Simpsons’* runtime.  
 - **Submitting to Repos:** Merge conflicts that feel like Shakespearean tragedies.  
 
-**The result?** Users still sign transactions labeled *“0xAeF354…”* with the same blind faith as clicking *“Download Free Ringtones”* in 2003.  
+**The result?** Because developers don't do this, users still sign transactions labeled *“0xAeF354…”* with the same blind faith as clicking *“Download Free Ringtones”* in 2003.  
 
 ---
 
