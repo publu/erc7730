@@ -1,10 +1,11 @@
-import React, { useState, useCallback } from 'react';
-import Editor from '@monaco-editor/react';
-import { Download } from 'lucide-react';
-import { ApiKeyModal } from './components/ApiKeyModal';
-import { DropZone } from './components/DropZone';
-import { generateMetadata } from './utils/openai';
-import { v4 as uuidv4 } from 'uuid';
+import React, { useState, useCallback } from "react";
+import Editor from "@monaco-editor/react";
+import { Download, ViewIcon } from "lucide-react";
+import { ApiKeyModal } from "./components/ApiKeyModal";
+import { DropZone } from "./components/DropZone";
+import { generateMetadata } from "./utils/openai";
+import { v4 as uuidv4 } from "uuid";
+import { PreviewModal } from "./components/Preview/PreviewModal";
 
 interface Project {
   id: string;
@@ -20,139 +21,169 @@ interface AppProps {
 
 function App({ onGoHome }: AppProps) {
   const [projects, setProjects] = useState<Project[]>(() => {
-    const stored = localStorage.getItem('erc7730_projects');
+    const stored = localStorage.getItem("erc7730_projects");
     return stored ? JSON.parse(stored) : [];
   });
 
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() => {
-    const storedId = localStorage.getItem('erc7730_selectedProjectId');
-    return storedId || null;
-  });
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    () => {
+      const storedId = localStorage.getItem("erc7730_selectedProjectId");
+      return storedId || null;
+    }
+  );
 
-  const [showApiKeyModal, setShowApiKeyModal] = useState(!localStorage.getItem('openai_api_key'));
+  const [showApiKeyModal, setShowApiKeyModal] = useState(
+    !localStorage.getItem("openai_api_key")
+  );
   const [loading, setLoading] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
 
-  const selectedProject = projects.find((p) => p.id === selectedProjectId) || null;
+  const selectedProject =
+    projects.find((p) => p.id === selectedProjectId) || null;
 
   const saveProjectsAndSelection = useCallback(
-    (updatedProjects: Project[], updatedSelectedProjectId: string | null = selectedProjectId) => {
+    (
+      updatedProjects: Project[],
+      updatedSelectedProjectId: string | null = selectedProjectId
+    ) => {
       setProjects(updatedProjects);
       if (updatedSelectedProjectId !== null) {
         setSelectedProjectId(updatedSelectedProjectId);
       }
-      localStorage.setItem('erc7730_projects', JSON.stringify(updatedProjects));
+      localStorage.setItem("erc7730_projects", JSON.stringify(updatedProjects));
       if (updatedSelectedProjectId) {
-        localStorage.setItem('erc7730_selectedProjectId', updatedSelectedProjectId);
+        localStorage.setItem(
+          "erc7730_selectedProjectId",
+          updatedSelectedProjectId
+        );
       } else {
-        localStorage.removeItem('erc7730_selectedProjectId');
+        localStorage.removeItem("erc7730_selectedProjectId");
       }
     },
     [selectedProjectId]
   );
 
   const handleApiKeySubmit = useCallback((apiKey: string) => {
-    localStorage.setItem('openai_api_key', apiKey);
+    localStorage.setItem("openai_api_key", apiKey);
     setShowApiKeyModal(false);
   }, []);
 
   // Updated to accept filename
-const handleFileDrop = useCallback(
-  async (content: string, filename: string) => {
-    try {
-      const apiKey = localStorage.getItem('openai_api_key');
-      if (!apiKey) {
-        setShowApiKeyModal(true);
-        return;
-      }
-
-      setLoading(true);
-      const fullResponse = await generateMetadata(apiKey, content);
-      setLoading(false);
-
-      const responseStr = typeof fullResponse === 'string' ? fullResponse : JSON.stringify(fullResponse);
-      const codeBlockRegex = /```json\s*([\s\S]*?)```/i;
-      const match = codeBlockRegex.exec(responseStr);
-
-      let jsonOnly = '';
-      let remainingComments = '';
-
-      if (match && match[1]) {
-        jsonOnly = match[1].trim();
-        remainingComments = responseStr.replace(codeBlockRegex, '').trim();
-      } else {
-        jsonOnly = responseStr;
-        remainingComments = '';
-      }
-
-      // Attempt to parse jsonOnly to find $id
-      let baseName = 'New Project';
+  const handleFileDrop = useCallback(
+    async (content: string, filename: string) => {
       try {
-        const parsed = JSON.parse(jsonOnly);
-        if (parsed.context && typeof parsed.context.$id === 'string' && parsed.context.$id.trim() !== '') {
-          baseName = parsed.context.$id.trim();
+        const apiKey = localStorage.getItem("openai_api_key");
+        if (!apiKey) {
+          setShowApiKeyModal(true);
+          return;
         }
-      } catch (e) {
-        console.warn('Failed to parse JSON or find $id, using "New Project" as fallback.');
+
+        setLoading(true);
+        const fullResponse = await generateMetadata(apiKey, content);
+        setLoading(false);
+
+        const responseStr =
+          typeof fullResponse === "string"
+            ? fullResponse
+            : JSON.stringify(fullResponse);
+        const codeBlockRegex = /```json\s*([\s\S]*?)```/i;
+        const match = codeBlockRegex.exec(responseStr);
+
+        let jsonOnly = "";
+        let remainingComments = "";
+
+        if (match && match[1]) {
+          jsonOnly = match[1].trim();
+          remainingComments = responseStr.replace(codeBlockRegex, "").trim();
+        } else {
+          jsonOnly = responseStr;
+          remainingComments = "";
+        }
+
+        // Attempt to parse jsonOnly to find $id
+        let baseName = "New Project";
+        try {
+          const parsed = JSON.parse(jsonOnly);
+          if (
+            parsed.context &&
+            typeof parsed.context.$id === "string" &&
+            parsed.context.$id.trim() !== ""
+          ) {
+            baseName = parsed.context.$id.trim();
+          }
+        } catch (e) {
+          console.warn(
+            'Failed to parse JSON or find $id, using "New Project" as fallback.'
+          );
+        }
+
+        // If a project with this baseName already exists, append (n)
+        let uniqueName = baseName;
+        let counter = 2;
+        while (
+          projects.some(
+            (p) => p.name === uniqueName && p.id !== selectedProjectId
+          )
+        ) {
+          uniqueName = `${baseName}(${counter})`;
+          counter++;
+        }
+
+        if (selectedProject) {
+          const updatedProject: Project = {
+            ...selectedProject,
+            name: uniqueName,
+            editorContent: jsonOnly,
+            commentContent: remainingComments,
+            generated: true,
+          };
+          const updatedProjects = projects.map((p) =>
+            p.id === selectedProjectId ? updatedProject : p
+          );
+          saveProjectsAndSelection(updatedProjects);
+        } else {
+          const newProject: Project = {
+            id: uuidv4(),
+            name: uniqueName,
+            editorContent: jsonOnly,
+            commentContent: remainingComments,
+            generated: true,
+          };
+          saveProjectsAndSelection([...projects, newProject], newProject.id);
+        }
+      } catch (error) {
+        console.error("Error processing file:", error);
+        alert("Error generating metadata from the Solidity file.");
+        setLoading(false);
       }
-
-      // If a project with this baseName already exists, append (n)
-      let uniqueName = baseName;
-      let counter = 2;
-      while (projects.some((p) => p.name === uniqueName && p.id !== selectedProjectId)) {
-        uniqueName = `${baseName}(${counter})`;
-        counter++;
-      }
-
-      if (selectedProject) {
-        const updatedProject: Project = {
-          ...selectedProject,
-          name: uniqueName,
-          editorContent: jsonOnly,
-          commentContent: remainingComments,
-          generated: true,
-        };
-        const updatedProjects = projects.map((p) =>
-          p.id === selectedProjectId ? updatedProject : p
-        );
-        saveProjectsAndSelection(updatedProjects);
-      } else {
-        const newProject: Project = {
-          id: uuidv4(),
-          name: uniqueName,
-          editorContent: jsonOnly,
-          commentContent: remainingComments,
-          generated: true,
-        };
-        saveProjectsAndSelection([...projects, newProject], newProject.id);
-      }
-    } catch (error) {
-      console.error('Error processing file:', error);
-      alert('Error generating metadata from the Solidity file.');
-      setLoading(false);
-    }
-  },
-  [projects, selectedProject, selectedProjectId, saveProjectsAndSelection]
-);
-
-
+    },
+    [projects, selectedProject, selectedProjectId, saveProjectsAndSelection]
+  );
 
   const handleExport = useCallback(() => {
     if (!selectedProject) return;
-    const blob = new Blob([selectedProject.editorContent], { type: 'application/json' });
+    const blob = new Blob([selectedProject.editorContent], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = `${selectedProject.name.replace(/\s+/g, '_')}_metadata.json`;
+    a.download = `${selectedProject.name.replace(/\s+/g, "_")}_metadata.json`;
     a.click();
     URL.revokeObjectURL(url);
+  }, [selectedProject]);
+
+  const handlePreview = useCallback(() => {
+    if (!selectedProject) return;
+    setShowPreviewModal(true);
   }, [selectedProject]);
 
   const handleCreateProject = useCallback(() => {
     const newProject: Project = {
       id: uuidv4(),
-      name: 'Untitled Project',
-      editorContent: '// Generated metadata will appear here',
-      commentContent: '',
+      name: "Untitled Project",
+      editorContent: "// Generated metadata will appear here",
+      commentContent: "",
       generated: false,
     };
     saveProjectsAndSelection([...projects, newProject], newProject.id);
@@ -161,7 +192,8 @@ const handleFileDrop = useCallback(
   const handleDeleteProject = useCallback(() => {
     if (!selectedProjectId) return;
     const updatedProjects = projects.filter((p) => p.id !== selectedProjectId);
-    const newSelectedId = updatedProjects.length > 0 ? updatedProjects[0].id : null;
+    const newSelectedId =
+      updatedProjects.length > 0 ? updatedProjects[0].id : null;
     saveProjectsAndSelection(updatedProjects, newSelectedId);
   }, [projects, selectedProjectId, saveProjectsAndSelection]);
 
@@ -176,13 +208,10 @@ const handleFileDrop = useCallback(
     [projects, selectedProjectId, saveProjectsAndSelection]
   );
 
-  const handleSelectProject = useCallback(
-    (id: string) => {
-      setSelectedProjectId(id);
-      localStorage.setItem('erc7730_selectedProjectId', id);
-    },
-    []
-  );
+  const handleSelectProject = useCallback((id: string) => {
+    setSelectedProjectId(id);
+    localStorage.setItem("erc7730_selectedProjectId", id);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
@@ -220,7 +249,7 @@ const handleFileDrop = useCallback(
             <div>
               <label className="mr-2 font-semibold">Project:</label>
               <select
-                value={selectedProjectId || ''}
+                value={selectedProjectId || ""}
                 onChange={(e) => handleSelectProject(e.target.value)}
                 className="border rounded px-2 py-1"
               >
@@ -267,13 +296,22 @@ const handleFileDrop = useCallback(
               {selectedProject.generated && (
                 <div className="flex justify-between items-center">
                   <h2 className="text-xl font-semibold">Generated Metadata</h2>
-                  <button
-                    onClick={handleExport}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
-                  >
-                    <Download className="w-4 h-4" />
-                    Export JSON
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handlePreview}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                    >
+                      <ViewIcon className="w-4 h-4" />
+                      Preview
+                    </button>
+                    <button
+                      onClick={handleExport}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                    >
+                      <Download className="w-4 h-4" />
+                      Export JSON
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -288,7 +326,8 @@ const handleFileDrop = useCallback(
 
               {selectedProject.generated && (
                 <p className="text-sm text-gray-600">
-                  This JSON is editable. Feel free to make changes before exporting.
+                  This JSON is editable. Feel free to make changes before
+                  exporting.
                 </p>
               )}
 
@@ -298,16 +337,18 @@ const handleFileDrop = useCallback(
                   defaultLanguage="json"
                   value={selectedProject.editorContent}
                   onChange={(value) => {
-                    const newValue = value || '';
+                    const newValue = value || "";
                     const updatedProjects = projects.map((p) =>
-                      p.id === selectedProjectId ? { ...p, editorContent: newValue } : p
+                      p.id === selectedProjectId
+                        ? { ...p, editorContent: newValue }
+                        : p
                     );
                     saveProjectsAndSelection(updatedProjects);
                   }}
                   options={{
                     minimap: { enabled: false },
                     fontSize: 14,
-                    wordWrap: 'on'
+                    wordWrap: "on",
                   }}
                 />
               </div>
@@ -319,6 +360,14 @@ const handleFileDrop = useCallback(
           <div className="bg-white rounded-lg shadow-md p-8">
             <p>No projects yet. Click 'New Project' to start.</p>
           </div>
+        )}
+
+        {selectedProject && (
+          <PreviewModal
+            isOpen={showPreviewModal}
+            onClose={() => setShowPreviewModal(false)}
+            content={selectedProject.editorContent}
+          />
         )}
       </div>
     </div>
