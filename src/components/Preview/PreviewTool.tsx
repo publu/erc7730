@@ -48,12 +48,29 @@ export default function PreviewTool({ json }: Props) {
   return (
     <>
       {previewData && (
-        <div className="flex h-full w-full items-center justify-center bg-tool-background">
+        <div className="relative flex h-full w-full items-center justify-center bg-tool-background">
           <DevicesDemoInteractive
             data={previewData}
             selectedDevice={selectedDevice}
             selectedOperation={selectedOperation}
           />
+
+          {/* Device Selector */}
+          <div className="absolute bottom-6 right-6 flex items-center gap-4">
+            <label className="text-sm font-medium text-white">Device:</label>
+            <select
+              value={selectedDevice}
+              onChange={(e) => {
+                const newDevice = e.target.value as "flex" | "stax";
+                setSelectedDevice(newDevice);
+                localStorage.setItem("selectedDevice", newDevice);
+              }}
+              className="rounded-md border border-white/10 bg-black/20 px-4 py-2 text-sm text-white outline-none transition-colors hover:bg-black/30 focus:border-white/20"
+            >
+              <option value="flex">Ledger Flex</option>
+              <option value="stax">Ledger Stax</option>
+            </select>
+          </div>
         </div>
       )}
     </>
