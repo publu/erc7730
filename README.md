@@ -59,7 +59,8 @@ Testing signing flows **shouldn’t require a hardware wallet** or feel like set
 - Test **every possible signing flow**, from basic approvals to "Please Sign This Multisig Contract or Face Eternal Regret."  
 
 ### **Video Demo:**  
-[![Watch Demo](https://github.com/2manslkh/clear-signing-erc7730-registry/blob/dynamic-preview/developer-preview/demo.mp4)](https://github.com/2manslkh/clear-signing-erc7730-registry/blob/dynamic-preview/developer-preview/demo.mp4)  
+https://github.com/user-attachments/assets/96d5c6b0-a95e-45a1-b469-64ae93fae42c
+
 
 ---
 
